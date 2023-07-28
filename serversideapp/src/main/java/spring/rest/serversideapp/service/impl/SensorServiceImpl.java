@@ -5,22 +5,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BindingResult;
-import spring.rest.serversideapp.dto.MeasurementDTO;
 import spring.rest.serversideapp.dto.SensorDTO;
-import spring.rest.serversideapp.dto.converters.ConvertToSensorDTO;
 import spring.rest.serversideapp.exception.EntityHasAlreadyExistException;
 import spring.rest.serversideapp.exception.EntityValidationException;
 import spring.rest.serversideapp.model.Sensor;
 import spring.rest.serversideapp.repository.SensorRepository;
 import spring.rest.serversideapp.service.SensorService;
+import spring.rest.serversideapp.service.mapper.SensorMapper;
 import spring.rest.serversideapp.validator.SensorValidator;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static spring.rest.serversideapp.dto.converters.ConvertToSensor.convertToSensor;
-import static spring.rest.serversideapp.dto.converters.ConvertToSensorDTO.convertToSensorDTO;
 import static spring.rest.serversideapp.util.ErrorMessageBuilder.errorMessage;
 
 @Service
@@ -28,11 +25,13 @@ public class SensorServiceImpl implements SensorService {
 
     private final SensorRepository sensorRepository;
     private final SensorValidator sensorValidator;
+    private final SensorMapper sensorMapper;
 
     @Autowired
-    public SensorServiceImpl(SensorRepository sensorRepository, SensorValidator sensorValidator) {
+    public SensorServiceImpl(SensorRepository sensorRepository, SensorValidator sensorValidator, SensorMapper sensorMapper) {
         this.sensorRepository = sensorRepository;
         this.sensorValidator = sensorValidator;
+        this.sensorMapper = sensorMapper;
     }
 
     @Override
@@ -40,7 +39,7 @@ public class SensorServiceImpl implements SensorService {
     public void create(SensorDTO sensorDTO, BindingResult bindingResult) {
         validateDTO(sensorDTO, bindingResult);
 
-        Sensor sensor = convertToSensor(sensorDTO);
+        Sensor sensor = sensorMapper.mapToModel(sensorDTO);
         Optional<Sensor> sensorDB = sensorRepository.findByName(sensorDTO.getName());
         if (sensorDB.isPresent()) {
             throw new EntityHasAlreadyExistException(String.format("Sensor with name '%s' has already exist", sensorDB.get().getName()));
@@ -52,7 +51,7 @@ public class SensorServiceImpl implements SensorService {
     @Override
     public SensorDTO read(int id) {
         Optional<Sensor> sensorDB = sensorRepository.findById(id);
-        return convertToSensorDTO(sensorDB.orElseThrow(
+        return sensorMapper.mapToDTO(sensorDB.orElseThrow(
                 () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id))));
     }
 
@@ -60,7 +59,7 @@ public class SensorServiceImpl implements SensorService {
     public void update(int id, SensorDTO sensorDTO, BindingResult bindingResult) {
         validateDTO(sensorDTO, bindingResult);
 
-        Sensor sensorRequest = convertToSensor(sensorDTO);
+        Sensor sensorRequest = sensorMapper.mapToModel(sensorDTO);
         Optional<Sensor> sensorDB = sensorRepository.findById(id);
         Sensor sensor = sensorDB.orElseThrow(
                 () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id)));
@@ -80,7 +79,7 @@ public class SensorServiceImpl implements SensorService {
     public List<SensorDTO> findAll() {
         return sensorRepository.findAll()
                 .stream()
-                .map(ConvertToSensorDTO::convertToSensorDTO)
+                .map(sensorMapper::mapToDTO)
                 .collect(Collectors.toList());
     }
 

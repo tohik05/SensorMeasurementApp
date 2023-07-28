@@ -6,13 +6,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.validation.BindingResult;
 import spring.rest.serversideapp.dto.MeasurementDTO;
-import spring.rest.serversideapp.dto.converters.ConvertToMeasurementDTO;
 import spring.rest.serversideapp.exception.EntityValidationException;
 import spring.rest.serversideapp.model.Measurement;
 import spring.rest.serversideapp.model.Sensor;
 import spring.rest.serversideapp.repository.MeasurementRepository;
 import spring.rest.serversideapp.service.MeasurementService;
 import spring.rest.serversideapp.service.SensorService;
+import spring.rest.serversideapp.service.mapper.MeasurementMapper;
 import spring.rest.serversideapp.validator.MeasurementValidator;
 
 import java.time.LocalDateTime;
@@ -20,7 +20,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
-import static spring.rest.serversideapp.dto.converters.ConvertToMeasurement.convertToMeasurement;
 import static spring.rest.serversideapp.util.ErrorMessageBuilder.errorMessage;
 
 @Service
@@ -29,12 +28,15 @@ public class MeasurementServiceImpl implements MeasurementService {
     private final MeasurementRepository measurementRepository;
     private final SensorService sensorService;
     private final MeasurementValidator measurementValidator;
+    private final MeasurementMapper measurementMapper;
 
     @Autowired
-    public MeasurementServiceImpl(MeasurementRepository measurementRepository, SensorService sensorService, MeasurementValidator measurementValidator) {
+    public MeasurementServiceImpl(MeasurementRepository measurementRepository, SensorService sensorService,
+                                  MeasurementValidator measurementValidator, MeasurementMapper measurementMapper) {
         this.measurementRepository = measurementRepository;
         this.sensorService = sensorService;
         this.measurementValidator = measurementValidator;
+        this.measurementMapper = measurementMapper;
     }
 
     @Override
@@ -53,7 +55,7 @@ public class MeasurementServiceImpl implements MeasurementService {
     public void create(MeasurementDTO measurementDTO, BindingResult bindingResult) {
         validateDTO(measurementDTO, bindingResult);
 
-        Measurement measurement = convertToMeasurement(measurementDTO);
+        Measurement measurement = measurementMapper.mapToModel(measurementDTO);
         Optional<Sensor> sensor = sensorService.findByName(measurement.getSensor().getName());
 
         measurement.setSensor(sensor.orElseThrow(
@@ -67,7 +69,7 @@ public class MeasurementServiceImpl implements MeasurementService {
     public void update(int id, MeasurementDTO measurementDTO, BindingResult bindingResult) {
         validateDTO(measurementDTO, bindingResult);
 
-        Measurement measurementRequest = convertToMeasurement(measurementDTO);
+        Measurement measurementRequest = measurementMapper.mapToModel(measurementDTO);
         Optional<Measurement> measurementDB = measurementRepository.findById(id);
         Measurement measurement = measurementDB.orElseThrow(
                 () -> new EntityNotFoundException(String.format("Measurement with ID '%s' not found", id)));
@@ -94,7 +96,7 @@ public class MeasurementServiceImpl implements MeasurementService {
                 .stream()
                 .filter(sensor -> sensor.getSensor().getName().equals(sensorName))
                 .filter(rain -> rain.getRaining() == isRaining)
-                .map(ConvertToMeasurementDTO::convertToMeasurementDTO)
+                .map(measurementMapper::mapToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -102,7 +104,7 @@ public class MeasurementServiceImpl implements MeasurementService {
         return measurementRepository.findAll()
                 .stream()
                 .filter(sensor -> sensor.getSensor().getName().equals(sensorName))
-                .map(ConvertToMeasurementDTO::convertToMeasurementDTO)
+                .map(measurementMapper::mapToDTO)
                 .collect(Collectors.toList());
     }
 
@@ -110,14 +112,14 @@ public class MeasurementServiceImpl implements MeasurementService {
         return measurementRepository.findAll()
                 .stream()
                 .filter(rain -> rain.getRaining() == isRaining)
-                .map(ConvertToMeasurementDTO::convertToMeasurementDTO)
+                .map(measurementMapper::mapToDTO)
                 .collect(Collectors.toList());
     }
 
     private List<MeasurementDTO> findAllMeasurements() {
         return measurementRepository.findAll()
                 .stream()
-                .map(ConvertToMeasurementDTO::convertToMeasurementDTO)
+                .map(measurementMapper::mapToDTO)
                 .collect(Collectors.toList());
     }
 
