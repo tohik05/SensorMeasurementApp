@@ -17,7 +17,6 @@ import spring.rest.serversideapp.validator.MeasurementValidator;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static spring.rest.serversideapp.util.ErrorMessageBuilder.errorMessage;
@@ -25,8 +24,8 @@ import static spring.rest.serversideapp.util.ErrorMessageBuilder.errorMessage;
 @Service
 public class MeasurementServiceImpl implements MeasurementService {
 
-    private final MeasurementRepository measurementRepository;
     private final SensorService sensorService;
+    private final MeasurementRepository measurementRepository;
     private final MeasurementValidator measurementValidator;
     private final MeasurementMapper measurementMapper;
 
@@ -55,14 +54,13 @@ public class MeasurementServiceImpl implements MeasurementService {
     public void create(MeasurementDTO measurementDTO, BindingResult bindingResult) {
         validateDTO(measurementDTO, bindingResult);
 
-        Measurement measurement = measurementMapper.mapToModel(measurementDTO);
-        Optional<Sensor> sensor = sensorService.findByName(measurement.getSensor().getName());
+        Measurement measurementForSave = measurementMapper.mapToModel(measurementDTO);
+        Sensor sensor = checkSensor(measurementForSave);
 
-        measurement.setSensor(sensor.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Sensor with name '%s' has not found", measurement.getSensor().getName()))));
-        measurement.setCreatedDate(LocalDateTime.now());
+        measurementForSave.setSensor(sensor);
+        measurementForSave.setCreatedDate(LocalDateTime.now());
 
-        measurementRepository.save(measurement);
+        measurementRepository.save(measurementForSave);
     }
 
     @Override
@@ -70,25 +68,29 @@ public class MeasurementServiceImpl implements MeasurementService {
         validateDTO(measurementDTO, bindingResult);
 
         Measurement measurementRequest = measurementMapper.mapToModel(measurementDTO);
-        Optional<Measurement> measurementDB = measurementRepository.findById(id);
-        Measurement measurement = measurementDB.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Measurement with ID '%s' not found", id)));
+        Measurement measurementForUpdate = checkMeasurement(id);
+        Sensor sensor = checkSensor(measurementRequest);
 
-        Optional<Sensor> sensorByName = sensorService.findByName(measurementRequest.getSensor().getName());
-        measurement.setSensor(sensorByName.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Sensor with name '%s' not found", measurementRequest.getSensor().getName()))));
-        measurement.setTemperature(measurementRequest.getTemperature());
-        measurement.setRaining(measurementRequest.getRaining());
+        measurementForUpdate.setSensor(sensor);
+        measurementForUpdate.setTemperature(measurementRequest.getTemperature());
+        measurementForUpdate.setRaining(measurementRequest.getRaining());
 
-        measurementRepository.save(measurement);
+        measurementRepository.save(measurementForUpdate);
     }
 
     @Override
     public void delete(int id) {
-        Optional<Measurement> measurementDB = measurementRepository.findById(id);
+        measurementRepository.delete(checkMeasurement(id));
+    }
 
-        measurementRepository.delete(measurementDB.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Measurement with ID '%s' not found", id))));
+    private Measurement checkMeasurement(int id) {
+        return measurementRepository.findById(id).orElseThrow(
+                () -> new EntityNotFoundException(String.format("Measurement with ID '%s' not found", id)));
+    }
+
+    private Sensor checkSensor(Measurement measurement) {
+        return sensorService.findByName(measurement.getSensor().getName()).orElseThrow(
+                () -> new EntityNotFoundException(String.format("Sensor with name '%s' not found", measurement.getSensor().getName())));
     }
 
     private List<MeasurementDTO> findAllMeasurementsBySensorNameAndRaining(String sensorName, Boolean isRaining) {

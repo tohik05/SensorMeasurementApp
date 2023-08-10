@@ -39,20 +39,14 @@ public class SensorServiceImpl implements SensorService {
     public void create(SensorDTO sensorDTO, BindingResult bindingResult) {
         validateDTO(sensorDTO, bindingResult);
 
-        Sensor sensor = sensorMapper.mapToModel(sensorDTO);
-        Optional<Sensor> sensorDB = sensorRepository.findByName(sensorDTO.getName());
-        if (sensorDB.isPresent()) {
-            throw new EntityHasAlreadyExistException(String.format("Sensor with name '%s' has already exist", sensorDB.get().getName()));
-        }
+        checkSensorByName(sensorDTO.getName());
 
-        sensorRepository.save(sensor);
+        sensorRepository.save(sensorMapper.mapToModel(sensorDTO));
     }
 
     @Override
     public SensorDTO read(int id) {
-        Optional<Sensor> sensorDB = sensorRepository.findById(id);
-        return sensorMapper.mapToDTO(sensorDB.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id))));
+        return sensorMapper.mapToDTO(checkSensorById(id));
     }
 
     @Override
@@ -60,19 +54,15 @@ public class SensorServiceImpl implements SensorService {
         validateDTO(sensorDTO, bindingResult);
 
         Sensor sensorRequest = sensorMapper.mapToModel(sensorDTO);
-        Optional<Sensor> sensorDB = sensorRepository.findById(id);
-        Sensor sensor = sensorDB.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id)));
-        sensor.setName(sensorRequest.getName());
+        Sensor sensorForUpdate = checkSensorById(id);
+        sensorForUpdate.setName(sensorRequest.getName());
 
-        sensorRepository.save(sensor);
+        sensorRepository.save(sensorForUpdate);
     }
 
     @Override
     public void delete(int id) {
-        Optional<Sensor> sensorDB = sensorRepository.findById(id);
-        sensorRepository.delete(sensorDB.orElseThrow(
-                () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id))));
+        sensorRepository.delete(checkSensorById(id));
     }
 
     @Override
@@ -95,4 +85,15 @@ public class SensorServiceImpl implements SensorService {
         }
     }
 
+    private Sensor checkSensorById(int id){
+        return sensorRepository.findById(id).orElseThrow(
+                () -> new EntityNotFoundException(String.format("Sensor with ID '%s' not found", id)));
+    }
+
+    private void checkSensorByName(String name) {
+        Optional<Sensor> sensorDB = sensorRepository.findByName(name);
+        if (sensorDB.isPresent()) {
+            throw new EntityHasAlreadyExistException(String.format("Sensor with name '%s' has already exist", name));
+        }
+    }
 }
